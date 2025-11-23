@@ -12,6 +12,8 @@ A Rust-based CLI tool for managing wallpapers from Wallhaven on Hyprland (Waylan
 - **Workspace Integration**: Temporarily switches to an empty workspace during selection for unobstructed preview.
 - **Authentication**: Supports Wallhaven API keys for accessing NSFW/restricted content.
 - **Persistence**: Remembers settings (Categories, Purity, Sorting) across sessions.
+- **Hyprlock Support**: Automatically generates a compatible `hyprlock` configuration.
+- **Session Restoration**: Restore your last set wallpapers automatically on reboot.
 
 ## Screenshots
 
@@ -23,19 +25,21 @@ A Rust-based CLI tool for managing wallpapers from Wallhaven on Hyprland (Waylan
 
 ## Installation
 
-### Prerequisites
+### AUR (Arch User Repository)
 
-- **Rust**: `cargo` (for building)
-- **Hyprland**: The compositor.
-- **hyprpaper**: For setting wallpapers (daemon must be running).
-- **fuzzel**: For the interactive menu.
-- **hyprctl**: For controlling Hyprland/hyprpaper.
+You can install `hyprwallhaven` directly from the AUR using your preferred helper:
+
+```bash
+yay -S hyprwallhaven
+# or
+paru -S hyprwallhaven
+```
 
 ### Build from Source
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/username/hyprwallhaven.git
+    git clone https://github.com/AnatolyRugalev/hyprwallhaven.git
     cd hyprwallhaven
     ```
 
@@ -51,11 +55,31 @@ A Rust-based CLI tool for managing wallpapers from Wallhaven on Hyprland (Waylan
     cp hyprwallhaven.desktop ~/.local/share/applications/
     ```
 
-## Configuration
+## Setup & Configuration
 
-The configuration file is located at `~/.config/hypr/hyprwallhaven.toml`. It is generated automatically on the first run.
+### 1. Hyprland (Restore on Boot)
 
-### Defaults
+To ensure your wallpapers are restored after a reboot or session restart, add the following line to your `~/.config/hypr/hyprland.conf`:
+
+```ini
+exec-once = hyprwallhaven restore
+```
+
+### 2. Hyprlock Integration
+
+HyprWallhaven automatically maintains a separate configuration file for `hyprlock` that ensures your lock screen background matches your desktop wallpaper.
+
+To enable this, add the following line to your `~/.config/hypr/hyprlock.conf`:
+
+```ini
+source = ~/.config/hypr/hyprwallhaven-hyprlock.conf
+```
+
+### 3. General Configuration
+
+The main configuration file is located at `~/.config/hypr/hyprwallhaven.toml`. It is generated automatically on the first run.
+
+#### Defaults
 
 ```toml
 # Command to set the wallpaper.
@@ -82,8 +106,6 @@ To access NSFW or restricted content, an API key is required:
 1.  Get your API key from your [Wallhaven Account Settings](https://wallhaven.cc/settings/account).
 2.  Uncomment and set `api_key` in `~/.config/hypr/hyprwallhaven.toml`.
 
-
-
 ## Usage
 
 ### CLI
@@ -92,6 +114,7 @@ To access NSFW or restricted content, an API key is required:
 - **Rotate (Random Hot)**: `hyprwallhaven rotate`
 - **Set by ID/URL**: `hyprwallhaven set <ID_OR_URL>`
 - **Search (Browser)**: `hyprwallhaven search <QUERY>`
+- **Restore**: `hyprwallhaven restore` (usually run automatically)
 
 ### Interactive Controls
 
