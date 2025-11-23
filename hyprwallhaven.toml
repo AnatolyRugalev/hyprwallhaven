@@ -1,0 +1,28 @@
+# Default configuration for hyprwallhaven
+
+# Command to set the wallpaper.
+# %f will be replaced by the wallpaper image path.
+# %m will be replaced by the active monitor name (e.g., eDP-1, DP-1).
+wallpaper_cmd = "hyprctl hyprpaper preload %f; hyprctl hyprpaper wallpaper \"%m,%f\""
+
+# Directory where downloaded wallpapers will be saved.
+save_dir = "~/Pictures/Wallpapers/Wallhaven"
+
+# Optional: API Key for NSFW/restricted content. Required to view/download NSFW or restricted wallpapers.
+# api_key = "YOUR_API_KEY"
+
+# Categories for wallpaper search (e.g., "111" for General, Anime, People).
+# 1st digit: General (1=on, 0=off)
+# 2nd digit: Anime (1=on, 0=off)
+# 3rd digit: People (1=on, 0=off)
+categories = "111"
+
+# Purity for wallpaper search (e.g., "100" for SFW only).
+# 1st digit: SFW (1=on, 0=off)
+# 2nd digit: Sketchy (1=on, 0=off)
+# 3rd digit: NSFW (1=on, 0=off)
+purity = "100"
+
+# Sorting method for search results.
+# Options: "relevance", "random", "date_added", "views", "favorites", "toplist", "hot"
+sorting = "hot"

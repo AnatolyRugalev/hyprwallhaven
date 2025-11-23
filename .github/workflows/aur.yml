@@ -1,0 +1,27 @@
+name: Deploy to AUR
+
+on: 
+  push:
+    branches:
+      - main # Or master, depending on your default branch
+    paths:
+      - 'hyprwallhaven/aur/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.AUR_PRIVATE_KEY }}
+
+      - name: Deploy to AUR
+        uses: lilydjwg/action-aur-publish@v2
+        with:
+          pkgbuild_dir: hyprwallhaven/aur
+          commit_username: GitHub Actions
+          commit_email: actions@github.com
