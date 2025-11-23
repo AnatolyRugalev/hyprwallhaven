@@ -1,5 +1,7 @@
 # HyprWallhaven
 
+> **Note:** This app is 99% vibe coded, and was built for my own needs. No warranties or support is provided. You are encouraged to take this idea and spin it off in a proper way. Contributions are welcome.
+
 A Rust-based CLI tool for managing wallpapers from Wallhaven on Hyprland (Wayland). It integrates with `fuzzel` for an interactive menu system and uses `hyprpaper` for setting wallpapers.
 
 ## Features
@@ -81,6 +83,8 @@ source = ~/.config/hypr/hyprwallhaven-hyprlock.conf
 ### 3. General Configuration
 
 The main configuration file is located at `~/.config/hypr/hyprwallhaven.toml`. It is generated automatically on the first run.
+
+> **Note:** I am aware that code-generated configuration files pose usability problems (i.e. comments are lost, user-specified settings are overwritten), but this tool's main feature is to provide interactive UX, so I don't really care enough to implement lossless config updates.
 
 #### Defaults
 
