@@ -19,6 +19,8 @@ A Rust-based CLI tool for managing wallpapers from Wallhaven on Hyprland (Waylan
 
 ## Screenshots
 
+<video src="screenshots/demo.mp4" controls title="Demo"></video>
+
 ![Main Menu](screenshots/menu.png)
 *Main interactive menu*
 
