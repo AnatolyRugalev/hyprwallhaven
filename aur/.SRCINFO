@@ -11,6 +11,7 @@ pkgbase = hyprwallhaven-git
 	depends = hyprpaper
 	provides = hyprwallhaven
 	conflicts = hyprwallhaven
+	options = !debug
 	source = git+https://github.com/AnatolyRugalev/hyprwallhaven.git
 	md5sums = SKIP
 
