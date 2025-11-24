@@ -1,5 +1,5 @@
 # Maintainer: Anatoly Rugalev <anatoly.rugalev@gmail.com>
-pkgname=hyprwallhaven
+pkgname=hyprwallhaven-git
 _pkgname=hyprwallhaven
 pkgver=0.1.0
 pkgrel=1
