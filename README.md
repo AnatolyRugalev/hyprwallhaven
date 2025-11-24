@@ -38,9 +38,9 @@ A Rust-based CLI tool for managing wallpapers from Wallhaven on Hyprland (Waylan
 You can install `hyprwallhaven` directly from the AUR using your preferred helper:
 
 ```bash
-yay -S hyprwallhaven
+yay -S hyprwallhaven-git
 # or
-paru -S hyprwallhaven
+paru -S hyprwallhaven-git
 ```
 
 ### Build from Source
@@ -70,6 +70,7 @@ paru -S hyprwallhaven
 To ensure your wallpapers are restored after a reboot or session restart, add the following line to your `~/.config/hypr/hyprland.conf`:
 
 ```ini
+exec-once = hyprpaper
 exec-once = hyprwallhaven restore
 ```
 
