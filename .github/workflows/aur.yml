@@ -1,11 +1,12 @@
 name: Deploy to AUR
 
-on: 
+on:
+  workflow_dispatch: {}
   push:
     branches:
       - main
     paths:
-      - 'aur/**'
+      - "aur/**"
 
 concurrency:
   group: aur_deployment
@@ -21,7 +22,7 @@ jobs:
       - name: Deploy to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
         with:
-          pkgname: hyprwallhaven
+          pkgname: hyprwallhaven-git
           pkgbuild: ./aur/PKGBUILD
           commit_username: GitHub Actions
           commit_email: actions@github.com
