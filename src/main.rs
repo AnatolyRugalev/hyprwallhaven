@@ -10,6 +10,8 @@ use config::{expand_path, load_config};
 use rand::Rng;
 use std::path::PathBuf;
 use std::process::Command;
+use std::thread;
+use std::time::Duration;
 use wallhaven::{download_wallpaper, get_wallpaper_info, search_wallpapers};
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -265,7 +267,10 @@ fn set_system_wallpaper(path: &PathBuf, config: &config::Config, monitor_name: &
         if trimmed.is_empty() {
             continue;
         }
-        Command::new("sh").arg("-c").arg(trimmed).spawn()?.wait()?;
+        let status = Command::new("sh").arg("-c").arg(trimmed).spawn()?.wait()?;
+        if !status.success() {
+            return Err(anyhow::anyhow!("Command failed: {}", trimmed));
+        }
     }
 
     // Save State
@@ -292,8 +297,22 @@ fn restore_wallpapers(config: &config::Config) -> Result<()> {
             println!("Restoring {} on {}", path, monitor);
             // We reuse set_system_wallpaper but we must be careful not to create a loop
             // set_system_wallpaper saves state again. That's fine, it's idempotent.
-            if let Err(e) = set_system_wallpaper(&path_buf, config, monitor) {
-                eprintln!("Failed to restore wallpaper on {}: {}", monitor, e);
+            
+            let mut attempts = 0;
+            const MAX_ATTEMPTS: i32 = 5;
+            loop {
+                match set_system_wallpaper(&path_buf, config, monitor) {
+                    Ok(_) => break,
+                    Err(e) => {
+                         attempts += 1;
+                         if attempts >= MAX_ATTEMPTS {
+                             eprintln!("Failed to restore wallpaper on {}: {} (after {} attempts)", monitor, e, attempts);
+                             break;
+                         }
+                         eprintln!("Attempt {}/{} failed for {}: {}. Retrying in 1s...", attempts, MAX_ATTEMPTS, monitor, e);
+                         thread::sleep(Duration::from_secs(1));
+                    }
+                }
             }
         } else {
             eprintln!("Wallpaper not found: {}", path);
