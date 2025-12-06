@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=Hypr wallhaven
-Comment=Manage and rotate Wallhaven wallpapers for Hyprland
-Exec=hyprwallhaven menu
-Terminal=false
-Type=Application
-Categories=Utility;Graphics;Wallpaper;
-Icon=hyprwallhaven
-Keywords=wallpaper;wallhaven;hyprland;fuzzel;background;
