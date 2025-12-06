@@ -7,6 +7,7 @@ pub enum MenuAction {
     SearchApi,
     SetId,
     Settings,
+    OpenCurrent,
     Custom(String),
     None,
 }
@@ -31,12 +32,17 @@ pub enum SettingsAction {
     None,
 }
 
-pub fn show_fuzzel_menu() -> Result<MenuAction> {
-    let options = "🎲 Rotate\n🔍 Search\n🆔 Set ID/URL\n⚙️ Settings\n";
+pub fn show_fuzzel_menu(show_current: bool) -> Result<MenuAction> {
+    let mut options = String::from("🎲 Rotate\n🔍 Search\n🆔 Set ID/URL\n⚙️ Settings\n");
+    let mut lines = 4;
+    if show_current {
+        options.push_str("👁️ Show Current Wallpaper\n");
+        lines = 5;
+    }
 
     let mut child = Command::new("fuzzel")
         .arg("--dmenu")
-        .arg("--lines=4")
+        .arg(format!("--lines={}", lines))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()?;
@@ -58,6 +64,7 @@ pub fn show_fuzzel_menu() -> Result<MenuAction> {
         s if s.contains("Search") => Ok(MenuAction::SearchApi),
         s if s.contains("Set ID") => Ok(MenuAction::SetId),
         s if s.contains("Settings") => Ok(MenuAction::Settings),
+        s if s.contains("Show Current Wallpaper") => Ok(MenuAction::OpenCurrent),
         "" => Ok(MenuAction::None),
         _ => Ok(MenuAction::Custom(selection)),
     }

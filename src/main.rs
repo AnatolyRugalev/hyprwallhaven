@@ -87,9 +87,7 @@ fn rotate_wallpaper(config: &mut config::Config) -> Result<()> {
             height: 1080,
             focused: true,
             transform: 0,
-            active_workspace: hyprland::ActiveWorkspace {
-                id: 1,
-            },
+            active_workspace: hyprland::ActiveWorkspace { id: 1 },
         }
     });
     let original_wallpaper = hyprland::get_current_wallpaper(&monitor.name).ok();
@@ -203,9 +201,7 @@ fn set_specific_wallpaper(id: &str, config: &config::Config) -> Result<()> {
         height: 1080,
         focused: true,
         transform: 0,
-        active_workspace: hyprland::ActiveWorkspace {
-            id: 1,
-        },
+        active_workspace: hyprland::ActiveWorkspace { id: 1 },
     });
     let original_wallpaper = hyprland::get_current_wallpaper(&monitor.name).ok();
     let original_workspace_id = monitor.active_workspace.id;
@@ -260,7 +256,7 @@ fn set_system_wallpaper(path: &PathBuf, config: &config::Config, monitor_name: &
     // Also replace literal "monitor_name" just in case user has old config or literal instruction
     cmd_str = cmd_str.replace("monitor_name", monitor_name);
     println!("Executing: {}", cmd_str);
-    
+
     // Execute command
     for sub_cmd in cmd_str.split(';') {
         let trimmed = sub_cmd.trim();
@@ -275,7 +271,9 @@ fn set_system_wallpaper(path: &PathBuf, config: &config::Config, monitor_name: &
 
     // Save State
     let mut state = state::load_state().unwrap_or_default();
-    state.wallpapers.insert(monitor_name.to_string(), path_str.to_string());
+    state
+        .wallpapers
+        .insert(monitor_name.to_string(), path_str.to_string());
     if let Err(e) = state::save_state(&state) {
         eprintln!("Warning: Failed to save state: {}", e);
     }
@@ -297,20 +295,26 @@ fn restore_wallpapers(config: &config::Config) -> Result<()> {
             println!("Restoring {} on {}", path, monitor);
             // We reuse set_system_wallpaper but we must be careful not to create a loop
             // set_system_wallpaper saves state again. That's fine, it's idempotent.
-            
+
             let mut attempts = 0;
             const MAX_ATTEMPTS: i32 = 5;
             loop {
                 match set_system_wallpaper(&path_buf, config, monitor) {
                     Ok(_) => break,
                     Err(e) => {
-                         attempts += 1;
-                         if attempts >= MAX_ATTEMPTS {
-                             eprintln!("Failed to restore wallpaper on {}: {} (after {} attempts)", monitor, e, attempts);
-                             break;
-                         }
-                         eprintln!("Attempt {}/{} failed for {}: {}. Retrying in 1s...", attempts, MAX_ATTEMPTS, monitor, e);
-                         thread::sleep(Duration::from_secs(1));
+                        attempts += 1;
+                        if attempts >= MAX_ATTEMPTS {
+                            eprintln!(
+                                "Failed to restore wallpaper on {}: {} (after {} attempts)",
+                                monitor, e, attempts
+                            );
+                            break;
+                        }
+                        eprintln!(
+                            "Attempt {}/{} failed for {}: {}. Retrying in 1s...",
+                            attempts, MAX_ATTEMPTS, monitor, e
+                        );
+                        thread::sleep(Duration::from_secs(1));
                     }
                 }
             }
@@ -323,10 +327,30 @@ fn restore_wallpapers(config: &config::Config) -> Result<()> {
 
 fn handle_menu(config: &mut config::Config) -> Result<()> {
     loop {
+        let mut current_wallhaven_id = None;
+        if let Ok(monitor) = hyprland::get_active_monitor() {
+            if let Ok(path) = hyprland::get_current_wallpaper(&monitor.name) {
+                let path_obj = std::path::Path::new(&path);
+                if let Some(filename) = path_obj.file_name().and_then(|f| f.to_str()) {
+                    if let Some(rest) = filename.strip_prefix("wallhaven-") {
+                        if let Some(dot_idx) = rest.rfind('.') {
+                            current_wallhaven_id = Some(rest[..dot_idx].to_string());
+                        }
+                    }
+                }
+            }
+        }
         use ui::MenuAction;
-        match ui::show_fuzzel_menu()? {
+        match ui::show_fuzzel_menu(current_wallhaven_id.is_some())? {
             MenuAction::Rotate => {
                 rotate_wallpaper(config)?;
+            }
+            MenuAction::OpenCurrent => {
+                if let Some(id) = current_wallhaven_id {
+                    let url = format!("https://wallhaven.cc/w/{}", id);
+                    open::that(url)?;
+                    return Ok(());
+                }
             }
             MenuAction::SearchApi => {
                 search_interactive(config, None)?;
@@ -472,9 +496,7 @@ fn search_interactive(
             height: 1080,
             focused: true,
             transform: 0,
-            active_workspace: hyprland::ActiveWorkspace {
-                id: 1,
-            },
+            active_workspace: hyprland::ActiveWorkspace { id: 1 },
         }
     });
     let original_wallpaper = hyprland::get_current_wallpaper(&monitor.name).ok(); // It's okay if we fail to get it
@@ -501,7 +523,8 @@ fn search_interactive(
             "portrait"
         };
         println!("Searching '{}' for {} ({})", query, monitor.name, ratio);
-        let wallpapers = search_wallpapers(config, Some(&query), 1, Some(ratio))?;
+        let mut current_page = 1;
+        let mut wallpapers = search_wallpapers(config, Some(&query), current_page, Some(ratio))?;
         if wallpapers.is_empty() {
             eprintln!("No results found for '{}'.", query);
             continue 'query_input_loop; // Go back to query prompt
@@ -516,7 +539,7 @@ fn search_interactive(
         hyprland::dispatch_workspace(empty_workspace_id)?;
         // 4. Interactive Loop
         let mut index = 0;
-        let total = wallpapers.len();
+        let mut total = wallpapers.len();
         let mut _current_set_path = None;
         // Set first immediately
         {
@@ -534,7 +557,26 @@ fn search_interactive(
             use ui::NavAction;
             match ui::show_search_nav_menu(index, total)? {
                 NavAction::Next => {
-                    index = (index + 1) % total;
+                    if index + 1 >= total {
+                        current_page += 1;
+                        match search_wallpapers(config, Some(&query), current_page, Some(ratio)) {
+                            Ok(new_batch) => {
+                                if new_batch.is_empty() {
+                                    index = 0;
+                                } else {
+                                    wallpapers.extend(new_batch);
+                                    total = wallpapers.len();
+                                    index += 1;
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to load next page: {}", e);
+                                index = 0;
+                            }
+                        }
+                    } else {
+                        index += 1;
+                    }
                 }
                 NavAction::Prev => {
                     if index == 0 {
@@ -605,9 +647,7 @@ fn set_direct_wallpaper(url: &str, config: &config::Config) -> Result<()> {
         height: 1080,
         focused: true,
         transform: 0,
-        active_workspace: hyprland::ActiveWorkspace {
-            id: 1,
-        },
+        active_workspace: hyprland::ActiveWorkspace { id: 1 },
     });
     let original_wallpaper = hyprland::get_current_wallpaper(&monitor.name).ok();
     let original_workspace_id = monitor.active_workspace.id;

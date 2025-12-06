@@ -70,7 +70,6 @@ paru -S hyprwallhaven-git
 To ensure your wallpapers are restored after a reboot or session restart, add the following line to your `~/.config/hypr/hyprland.conf`:
 
 ```ini
-exec-once = hyprpaper
 exec-once = hyprwallhaven restore
 ```
 
