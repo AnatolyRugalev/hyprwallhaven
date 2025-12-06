@@ -82,3 +82,28 @@ jobs:
           files: artifacts/*
           token: ${{ secrets.GITHUB_TOKEN }}
           generate_release_notes: true
+
+  deploy-aur:
+    name: Deploy to AUR
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update PKGBUILD version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          sed -i "s/^pkgver=.*$/pkgver=$VERSION/" aur-bin/PKGBUILD
+          sed -i "s/^pkgrel=.*$/pkgrel=1/" aur-bin/PKGBUILD
+
+      - name: Deploy to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
+        with:
+          pkgname: hyprwallhaven-bin
+          pkgbuild: ./aur-bin/PKGBUILD
+          commit_username: GitHub Actions
+          commit_email: actions@github.com
+          ssh_private_key: ${{ secrets.AUR_PRIVATE_KEY }}
+          commit_message: Update AUR package
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+          updpkgsums: true
