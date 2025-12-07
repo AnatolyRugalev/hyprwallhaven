@@ -8,10 +8,17 @@ pub struct Config {
     pub wallpaper_cmd: String,
     pub save_dir: String,
     pub api_key: Option<String>,
+    pub username: Option<String>,
     pub categories: String,
     pub purity: String,
     pub sorting: String,
     pub ratios: String,
+    #[serde(default = "default_wallpaper_mode")]
+    pub wallpaper_mode: String,
+}
+
+fn default_wallpaper_mode() -> String {
+    "contain".to_string()
 }
 
 impl Default for Config {
@@ -21,10 +28,12 @@ impl Default for Config {
                 .to_string(),
             save_dir: "~/Pictures/Wallpapers/Wallhaven".to_string(),
             api_key: None,
+            username: None,
             categories: "111".to_string(),
             purity: "100".to_string(),
             sorting: "hot".to_string(),
             ratios: "landscape".to_string(),
+            wallpaper_mode: default_wallpaper_mode(),
         }
     }
 }
