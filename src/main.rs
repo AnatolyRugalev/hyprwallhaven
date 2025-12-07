@@ -74,7 +74,10 @@ fn main() -> Result<()> {
     }
     Ok(())
 }
-fn rotate_wallpaper(config: &mut config::Config) -> Result<()> {
+fn rotate_wallpaper(global_config: &mut config::Config) -> Result<()> {
+    let mut config_val = global_config.clone();
+    let config = &mut config_val;
+
     // Get active monitor info
     let monitor = hyprland::get_active_monitor().unwrap_or_else(|e| {
         eprintln!(
@@ -111,7 +114,7 @@ fn rotate_wallpaper(config: &mut config::Config) -> Result<()> {
     // 1. Search for wallpapers (Hot list)
     // We use a random page to get more variety
     let page = rand::thread_rng().gen_range(1..=3);
-    let wallpapers = search_wallpapers(config, None, page, Some(ratio))?;
+    let mut wallpapers = search_wallpapers(config, None, page, Some(ratio))?;
     if wallpapers.is_empty() {
         eprintln!("No wallpapers found.");
         return Ok(());
@@ -129,7 +132,7 @@ fn rotate_wallpaper(config: &mut config::Config) -> Result<()> {
     // We can iterate or re-roll. Let's stick to "Random" meaning "pick random from list".
     // "Next" meaning "next in list".
     let mut index = rand::thread_rng().gen_range(0..wallpapers.len());
-    let total = wallpapers.len();
+    let mut total = wallpapers.len();
     let mut _current_set_path = None;
     // Set first immediately
     {
@@ -145,8 +148,74 @@ fn rotate_wallpaper(config: &mut config::Config) -> Result<()> {
     }
     'nav_loop: loop {
         use ui::NavAction;
-        match ui::show_search_nav_menu(index + 1, total)? {
-            // index + 1 for display 1-based
+        match ui::show_search_nav_menu(
+            index,
+            total,
+            config.api_key.is_some(),
+            &config.categories,
+            &config.purity,
+            &config.sorting,
+        )? {
+            NavAction::SettingsCategory => {
+                if let Some(new_cats) = ui::show_categories_menu(&config.categories)? {
+                    if config.categories != new_cats {
+                        config.categories = new_cats;
+                        let page = rand::thread_rng().gen_range(1..=3);
+                        match search_wallpapers(config, None, page, Some(ratio)) {
+                            Ok(new_batch) => {
+                                if new_batch.is_empty() {
+                                    eprintln!("No wallpapers found with new settings.");
+                                } else {
+                                    wallpapers = new_batch;
+                                    total = wallpapers.len();
+                                    index = rand::thread_rng().gen_range(0..total);
+                                }
+                            }
+                            Err(e) => eprintln!("Failed to refresh wallpapers: {}", e),
+                        }
+                    }
+                }
+            }
+            NavAction::SettingsPurity => {
+                if let Some(new_purity) = ui::show_purity_menu(&config.purity)? {
+                    if config.purity != new_purity {
+                        config.purity = new_purity;
+                        let page = rand::thread_rng().gen_range(1..=3);
+                        match search_wallpapers(config, None, page, Some(ratio)) {
+                            Ok(new_batch) => {
+                                if new_batch.is_empty() {
+                                    eprintln!("No wallpapers found with new settings.");
+                                } else {
+                                    wallpapers = new_batch;
+                                    total = wallpapers.len();
+                                    index = rand::thread_rng().gen_range(0..total);
+                                }
+                            }
+                            Err(e) => eprintln!("Failed to refresh wallpapers: {}", e),
+                        }
+                    }
+                }
+            }
+            NavAction::SettingsSorting => {
+                if let Some(new_sorting) = ui::show_sorting_menu(&config.sorting)? {
+                    if config.sorting != new_sorting {
+                        config.sorting = new_sorting;
+                        let page = rand::thread_rng().gen_range(1..=3);
+                        match search_wallpapers(config, None, page, Some(ratio)) {
+                            Ok(new_batch) => {
+                                if new_batch.is_empty() {
+                                    eprintln!("No wallpapers found with new settings.");
+                                } else {
+                                    wallpapers = new_batch;
+                                    total = wallpapers.len();
+                                    index = rand::thread_rng().gen_range(0..total);
+                                }
+                            }
+                            Err(e) => eprintln!("Failed to refresh wallpapers: {}", e),
+                        }
+                    }
+                }
+            }
             NavAction::Next => {
                 index = (index + 1) % total;
             }
@@ -255,6 +324,18 @@ fn set_system_wallpaper(path: &PathBuf, config: &config::Config, monitor_name: &
     cmd_str = cmd_str.replace("%m", monitor_name);
     // Also replace literal "monitor_name" just in case user has old config or literal instruction
     cmd_str = cmd_str.replace("monitor_name", monitor_name);
+
+    // Apply wallpaper mode for hyprpaper
+    eprintln!("DEBUG: Wallpaper mode: {}", config.wallpaper_mode);
+    eprintln!("DEBUG: Command before modification: {}", cmd_str);
+    if config.wallpaper_mode == "contain" || config.wallpaper_mode == "tile" {
+        if cmd_str.contains("hyprpaper") {
+            let mode_prefix = format!(",{}:/", config.wallpaper_mode);
+            cmd_str = cmd_str.replace(",/", &mode_prefix);
+        }
+    }
+    eprintln!("DEBUG: Command after modification: {}", cmd_str);
+
     println!("Executing: {}", cmd_str);
 
     // Execute command
@@ -344,6 +425,9 @@ fn handle_menu(config: &mut config::Config) -> Result<()> {
         match ui::show_fuzzel_menu(current_wallhaven_id.is_some())? {
             MenuAction::Rotate => {
                 rotate_wallpaper(config)?;
+            }
+            MenuAction::Collections => {
+                handle_collections(config)?;
             }
             MenuAction::OpenCurrent => {
                 if let Some(id) = current_wallhaven_id {
@@ -438,7 +522,12 @@ fn handle_menu(config: &mut config::Config) -> Result<()> {
 fn handle_settings(config: &mut config::Config) -> Result<()> {
     loop {
         use ui::SettingsAction;
-        match ui::show_settings_menu()? {
+        match ui::show_settings_menu(
+            &config.categories,
+            &config.purity,
+            &config.sorting,
+            &config.wallpaper_mode,
+        )? {
             SettingsAction::Categories => {
                 loop {
                     if let Some(new_cats) = ui::show_categories_menu(&config.categories)? {
@@ -465,6 +554,12 @@ fn handle_settings(config: &mut config::Config) -> Result<()> {
                     config::save_config(config)?;
                 }
             }
+            SettingsAction::WallpaperMode => {
+                if let Some(new_mode) = ui::show_wallpaper_mode_menu(&config.wallpaper_mode)? {
+                    config.wallpaper_mode = new_mode;
+                    config::save_config(config)?;
+                }
+            }
             SettingsAction::SetApiKey => {
                 if let Ok(key) = ui::get_password_input("Enter Wallhaven API Key:") {
                     if !key.is_empty() {
@@ -480,10 +575,237 @@ fn handle_settings(config: &mut config::Config) -> Result<()> {
     }
     Ok(())
 }
-fn search_interactive(
+
+fn ensure_username(config: &mut config::Config) -> Result<String> {
+    if let Some(u) = &config.username {
+        return Ok(u.clone());
+    }
+
+    // Try to reload from disk first
+    if let Ok(loaded) = config::load_config() {
+        if let Some(u) = loaded.username {
+            config.username = Some(u.clone());
+            return Ok(u);
+        }
+    }
+
+    match wallhaven::get_username(config) {
+        Ok(u) => {
+            config.username = Some(u.clone());
+            config::save_config(config)?;
+            Ok(u)
+        }
+        Err(_) => {
+            let input = ui::get_user_input("Enter Wallhaven Username:")?;
+            if input.is_empty() {
+                anyhow::bail!("Username required");
+            }
+            config.username = Some(input.clone());
+            config::save_config(config)?;
+            Ok(input)
+        }
+    }
+}
+
+fn handle_collections(config: &mut config::Config) -> Result<()> {
+    let username = match ensure_username(config) {
+        Ok(u) => u,
+        Err(e) => {
+            eprintln!("Failed to get username: {}", e);
+            return Ok(());
+        }
+    };
+
+    println!("Fetching collections for {}...", username);
+    let collections = match wallhaven::get_my_collections(config) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to fetch collections: {}", e);
+            return Ok(());
+        }
+    };
+
+    if collections.is_empty() {
+        println!("No collections found.");
+        return Ok(());
+    }
+
+    let items: Vec<String> = collections.iter().map(|c| c.label.clone()).collect();
+    let selection = ui::show_selection_menu("Select Collection:", &items)?;
+
+    if let Some(label) = selection {
+        if let Some(collection) = collections.iter().find(|c| c.label == label) {
+            view_collection_wallpapers(config, &username, collection.id, &collection.label)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn view_collection_wallpapers(
     config: &mut config::Config,
+    username: &str,
+    collection_id: i64,
+    collection_label: &str,
+) -> Result<()> {
+    // 1. Get Monitor
+    let monitor = hyprland::get_active_monitor().unwrap_or_else(|_| hyprland::Monitor {
+        name: "".to_string(),
+        width: 1920,
+        height: 1080,
+        focused: true,
+        transform: 0,
+        active_workspace: hyprland::ActiveWorkspace { id: 1 },
+    });
+    let original_wallpaper = hyprland::get_current_wallpaper(&monitor.name).ok();
+    let original_workspace_id = monitor.active_workspace.id;
+
+    println!("Viewing collection: {}", collection_label);
+    
+    // 2. Fetch Wallpapers (Page 1 initially)
+    let mut current_page = 1;
+    let mut wallpapers =
+        wallhaven::get_collection_wallpapers(config, username, collection_id, current_page)?;
+
+    if wallpapers.is_empty() {
+        println!("Collection is empty.");
+        return Ok(());
+    }
+
+    // 3. Setup Workspace
+    let occupied = hyprland::get_occupied_workspaces().unwrap_or_default();
+    let mut empty_workspace_id = 10;
+    while occupied.contains(&empty_workspace_id) {
+        empty_workspace_id += 1;
+    }
+    hyprland::dispatch_workspace(empty_workspace_id)?;
+
+    // 4. Interactive Loop
+    let mut index = 0;
+    let mut total = wallpapers.len();
+    let mut _current_set_path = None; // Keep track to avoid excessive downloads? Not used logic in search_interactive either really.
+
+    // Set first immediately
+    {
+         let chosen_summary = &wallpapers[index];
+         // Collection API returns simplified wallpaper objects, might need full info to get path if not present?
+         // SearchResponse from wallhaven usually includes 'path'. Let's check wallhaven.rs struct. 
+         // Wallpaper struct has 'path'. API search/collection results usually have it.
+         // If "path" is missing/empty, we might need get_wallpaper_info. 
+         // But let's assume it's there for now as search_wallpapers uses it directly too.
+         
+         // Actually, wait, search_interactive fetches info again:
+         // let chosen = get_wallpaper_info(&chosen_summary.id, config)?;
+         // Let's do the same for consistency.
+         match get_wallpaper_info(&chosen_summary.id, config) {
+             Ok(chosen) => {
+                 let ext = chosen.path.split('.').last().unwrap_or("jpg");
+                 let filename = format!("wallhaven-{}.{}", chosen.id, ext);
+                 let save_path = expand_path(&config.save_dir).join(&filename);
+                 download_wallpaper(&chosen.path, &save_path)?;
+                 set_system_wallpaper(&save_path, config, &monitor.name)?;
+                 _current_set_path = Some(save_path);
+             },
+             Err(e) => eprintln!("Failed to load wallpaper info: {}", e),
+         }
+    }
+
+    'nav_loop: loop {
+        use ui::NavAction;
+        // reusing show_search_nav_menu even though some options like sorting/category might not apply to collections view in the same way?
+        // Collections are static lists. Filters might not apply to collection view endpoint?
+        // API docs say: /collections/{username}/{id} supports ?page=
+        // It does NOT support categories/purity/sorting params usually, as it's a manual collection.
+        // So generic search menu might show options that don't do anything here.
+        // We should arguably use a simpler menu or ignore those actions.
+        // Let's use show_search_nav_menu but ignore settings.
+        
+        match ui::show_search_nav_menu(
+            index,
+            total,
+            config.api_key.is_some(),
+            "N/A", // user can't change category of a collection view usually
+            "N/A",
+            "N/A", 
+        )? {
+            NavAction::Next => {
+                 if index + 1 >= total {
+                    // Try next page?
+                    let next_page_wallpapers = wallhaven::get_collection_wallpapers(config, username, collection_id, current_page + 1)?;
+                    if !next_page_wallpapers.is_empty() {
+                         current_page += 1;
+                         wallpapers.extend(next_page_wallpapers);
+                         total = wallpapers.len();
+                         index += 1;
+                    } else {
+                         index = 0; // Loop back to start
+                    }
+                } else {
+                    index += 1;
+                }
+            }
+            NavAction::Prev => {
+                 if index == 0 {
+                    index = total - 1;
+                } else {
+                    index -= 1;
+                }
+            }
+            NavAction::Random => {
+                index = rand::thread_rng().gen_range(0..total);
+            }
+            NavAction::OpenInBrowser => {
+                hyprland::dispatch_workspace(original_workspace_id)?;
+                let chosen_summary = &wallpapers[index];
+                println!("Opening in browser: {}", chosen_summary.short_url);
+                open::that(&chosen_summary.short_url)?;
+                std::process::exit(0);
+            }
+            NavAction::Done => {
+                 hyprland::dispatch_workspace(original_workspace_id)?;
+                 std::process::exit(0);
+            }
+            NavAction::Cancel | NavAction::None => {
+                hyprland::dispatch_workspace(original_workspace_id)?;
+                if let Some(ref orig_path) = original_wallpaper {
+                    println!("Restoring original wallpaper: {}", orig_path);
+                    set_system_wallpaper(&PathBuf::from(orig_path), config, &monitor.name)?;
+                }
+                break 'nav_loop;
+            }
+            // Ignore settings actions for collections
+            _ => {}
+        }
+
+        // Apply new selection
+        let chosen_summary = &wallpapers[index];
+        match get_wallpaper_info(&chosen_summary.id, config) {
+             Ok(chosen) => {
+                 let ext = chosen.path.split('.').last().unwrap_or("jpg");
+                 let filename = format!("wallhaven-{}.{}", chosen.id, ext);
+                 let save_path = expand_path(&config.save_dir).join(&filename);
+                 match download_wallpaper(&chosen.path, &save_path) {
+                    Ok(_) => {
+                         set_system_wallpaper(&save_path, config, &monitor.name)?;
+                         _current_set_path = Some(save_path);
+                    }
+                    Err(e) => eprintln!("Failed to download wallpaper: {}", e),
+                 }
+             },
+             Err(e) => eprintln!("Failed to load wallpaper info: {}", e),
+         }
+    }
+
+    Ok(())
+}
+
+fn search_interactive(
+    global_config: &mut config::Config,
     mut initial_query: Option<String>,
 ) -> Result<()> {
+    let mut config_val = global_config.clone();
+    let config = &mut config_val;
+
     // 1. Get Monitor & Original State
     let monitor = hyprland::get_active_monitor().unwrap_or_else(|e| {
         eprintln!(
@@ -555,7 +877,77 @@ fn search_interactive(
         }
         'nav_loop: loop {
             use ui::NavAction;
-            match ui::show_search_nav_menu(index, total)? {
+            match ui::show_search_nav_menu(
+                index,
+                total,
+                config.api_key.is_some(),
+                &config.categories,
+                &config.purity,
+                &config.sorting,
+            )? {
+                NavAction::SettingsCategory => {
+                    if let Some(new_cats) = ui::show_categories_menu(&config.categories)? {
+                        if config.categories != new_cats {
+                            config.categories = new_cats;
+                            current_page = 1;
+                            match search_wallpapers(config, Some(&query), current_page, Some(ratio))
+                            {
+                                Ok(new_batch) => {
+                                    if new_batch.is_empty() {
+                                        eprintln!("No results found with new settings.");
+                                    } else {
+                                        wallpapers = new_batch;
+                                        total = wallpapers.len();
+                                        index = 0;
+                                    }
+                                }
+                                Err(e) => eprintln!("Failed to refresh search: {}", e),
+                            }
+                        }
+                    }
+                }
+                NavAction::SettingsPurity => {
+                    if let Some(new_purity) = ui::show_purity_menu(&config.purity)? {
+                        if config.purity != new_purity {
+                            config.purity = new_purity;
+                            current_page = 1;
+                            match search_wallpapers(config, Some(&query), current_page, Some(ratio))
+                            {
+                                Ok(new_batch) => {
+                                    if new_batch.is_empty() {
+                                        eprintln!("No results found with new settings.");
+                                    } else {
+                                        wallpapers = new_batch;
+                                        total = wallpapers.len();
+                                        index = 0;
+                                    }
+                                }
+                                Err(e) => eprintln!("Failed to refresh search: {}", e),
+                            }
+                        }
+                    }
+                }
+                NavAction::SettingsSorting => {
+                    if let Some(new_sorting) = ui::show_sorting_menu(&config.sorting)? {
+                        if config.sorting != new_sorting {
+                            config.sorting = new_sorting;
+                            current_page = 1;
+                            match search_wallpapers(config, Some(&query), current_page, Some(ratio))
+                            {
+                                Ok(new_batch) => {
+                                    if new_batch.is_empty() {
+                                        eprintln!("No results found with new settings.");
+                                    } else {
+                                        wallpapers = new_batch;
+                                        total = wallpapers.len();
+                                        index = 0;
+                                    }
+                                }
+                                Err(e) => eprintln!("Failed to refresh search: {}", e),
+                            }
+                        }
+                    }
+                }
                 NavAction::Next => {
                     if index + 1 >= total {
                         current_page += 1;

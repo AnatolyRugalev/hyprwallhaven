@@ -1,0 +1,13 @@
+[Unit]
+Description=Restore HyprWallhaven wallpapers
+After=hyprpaper.service
+Wants=hyprpaper.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/hyprwallhaven restore
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=graphical-session.target

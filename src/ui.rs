@@ -7,6 +7,7 @@ pub enum MenuAction {
     SearchApi,
     SetId,
     Settings,
+    Collections,
     OpenCurrent,
     Custom(String),
     None,
@@ -18,6 +19,9 @@ pub enum NavAction {
     Prev,
     Random,
     OpenInBrowser,
+    SettingsCategory,
+    SettingsPurity,
+    SettingsSorting,
     Done,
     Cancel,
     None,
@@ -27,13 +31,14 @@ pub enum SettingsAction {
     Categories,
     Purity,
     Sorting,
+    WallpaperMode,
     SetApiKey,
     Back,
     None,
 }
 
 pub fn show_fuzzel_menu(show_current: bool) -> Result<MenuAction> {
-    let mut options = String::from("🎲 Rotate\n🔍 Search\n🆔 Set ID/URL\n⚙️ Settings\n");
+    let mut options = String::from("🎲 Rotate\n🔍 Search\n📚 Collections\n🆔 Set ID/URL\n⚙️ Settings\n");
     let mut lines = 4;
     if show_current {
         options.push_str("👁️ Show Current Wallpaper\n");
@@ -62,6 +67,7 @@ pub fn show_fuzzel_menu(show_current: bool) -> Result<MenuAction> {
     match selection.as_str() {
         s if s.contains("Rotate") => Ok(MenuAction::Rotate),
         s if s.contains("Search") => Ok(MenuAction::SearchApi),
+        s if s.contains("Collections") => Ok(MenuAction::Collections),
         s if s.contains("Set ID") => Ok(MenuAction::SetId),
         s if s.contains("Settings") => Ok(MenuAction::Settings),
         s if s.contains("Show Current Wallpaper") => Ok(MenuAction::OpenCurrent),
@@ -70,14 +76,54 @@ pub fn show_fuzzel_menu(show_current: bool) -> Result<MenuAction> {
     }
 }
 
-pub fn show_settings_menu() -> Result<SettingsAction> {
-    let options = "📂 Categories\n🔞 Purity\n📶 Sorting\n🔑 Set API Key\n🔙 Back\n";
+pub fn show_settings_menu(
+    categories: &str,
+    purity: &str,
+    sorting: &str,
+    wallpaper_mode: &str,
+) -> Result<SettingsAction> {
+    let mut cat_list = Vec::new();
+    if categories.chars().nth(0).unwrap_or('0') == '1' {
+        cat_list.push("General");
+    }
+    if categories.chars().nth(1).unwrap_or('0') == '1' {
+        cat_list.push("Anime");
+    }
+    if categories.chars().nth(2).unwrap_or('0') == '1' {
+        cat_list.push("People");
+    }
+    let cat_str = if cat_list.is_empty() {
+        "None".to_string()
+    } else {
+        cat_list.join(", ")
+    };
+
+    let mut purity_list = Vec::new();
+    if purity.chars().nth(0).unwrap_or('0') == '1' {
+        purity_list.push("SFW");
+    }
+    if purity.chars().nth(1).unwrap_or('0') == '1' {
+        purity_list.push("Sketchy");
+    }
+    if purity.chars().nth(2).unwrap_or('0') == '1' {
+        purity_list.push("NSFW");
+    }
+    let purity_str = if purity_list.is_empty() {
+        "None".to_string()
+    } else {
+        purity_list.join(", ")
+    };
+
+    let options = format!(
+        "📂 Categories [{}]\n🔞 Purity [{}]\n📶 Sorting [{}]\n🖼️ Wallpaper Mode [{}]\n🔑 Set API Key\n🔙 Back\n",
+        cat_str, purity_str, sorting, wallpaper_mode
+    );
 
     let mut child = Command::new("fuzzel")
         .arg("--dmenu")
         .arg("-p")
         .arg("Settings: ")
-        .arg("--lines=5")
+        .arg("--lines=6")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()?;
@@ -98,10 +144,42 @@ pub fn show_settings_menu() -> Result<SettingsAction> {
         s if s.contains("Categories") => Ok(SettingsAction::Categories),
         s if s.contains("Purity") => Ok(SettingsAction::Purity),
         s if s.contains("Sorting") => Ok(SettingsAction::Sorting),
+        s if s.contains("Wallpaper Mode") => Ok(SettingsAction::WallpaperMode),
         s if s.contains("Set API Key") => Ok(SettingsAction::SetApiKey),
         s if s.contains("Back") => Ok(SettingsAction::Back),
         _ => Ok(SettingsAction::None),
     }
+}
+
+pub fn show_wallpaper_mode_menu(_current: &str) -> Result<Option<String>> {
+    let options = "contain\ncover\nfill\ntile\n🔙 Back\n";
+
+    let mut child = Command::new("fuzzel")
+        .arg("--dmenu")
+        .arg("-p")
+        .arg("Wallpaper Mode: ")
+        .arg("--lines=5")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin.write_all(options.as_bytes())?;
+    }
+
+    let output = child.wait_with_output()?;
+
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let selection = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    if selection.contains("Back") || selection.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(selection))
 }
 
 // ... (keeping other functions)
@@ -285,15 +363,58 @@ pub fn show_sorting_menu(_current: &str) -> Result<Option<String>> {
     Ok(Some(clean))
 }
 
-pub fn show_search_nav_menu(current: usize, total: usize) -> Result<NavAction> {
-    let options = "➡️ Next\n⬅️ Prev\n✅ Done\n🎲 Random\n🌐 Open in Browser\n❌ Cancel\n";
+pub fn show_search_nav_menu(
+    current: usize,
+    total: usize,
+    _has_api_key: bool,
+    categories: &str,
+    purity: &str,
+    sorting: &str,
+) -> Result<NavAction> {
+    let mut cat_list = Vec::new();
+    if categories.chars().nth(0).unwrap_or('0') == '1' {
+        cat_list.push("General");
+    }
+    if categories.chars().nth(1).unwrap_or('0') == '1' {
+        cat_list.push("Anime");
+    }
+    if categories.chars().nth(2).unwrap_or('0') == '1' {
+        cat_list.push("People");
+    }
+    let cat_str = if cat_list.is_empty() {
+        "None".to_string()
+    } else {
+        cat_list.join(", ")
+    };
+
+    let mut purity_list = Vec::new();
+    if purity.chars().nth(0).unwrap_or('0') == '1' {
+        purity_list.push("SFW");
+    }
+    if purity.chars().nth(1).unwrap_or('0') == '1' {
+        purity_list.push("Sketchy");
+    }
+    if purity.chars().nth(2).unwrap_or('0') == '1' {
+        purity_list.push("NSFW");
+    }
+    let purity_str = if purity_list.is_empty() {
+        "None".to_string()
+    } else {
+        purity_list.join(", ")
+    };
+
+    let mut options = String::from("➡️ Next\n⬅️ Prev\n✅ Done\n🎲 Random\n🌐 Open in Browser\n");
+    options.push_str(&format!("📂 Category [{}]\n", cat_str));
+    options.push_str(&format!("🔞 Purity [{}]\n", purity_str));
+    options.push_str(&format!("📶 Sorting [{}]\n", sorting));
+
     let prompt = format!("Result {}/{}: ", current + 1, total);
 
     let mut child = Command::new("fuzzel")
         .arg("--dmenu")
         .arg("-p")
         .arg(prompt)
-        .arg("--lines=6")
+        .arg("--lines=10")
         .arg("--anchor=bottom")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -316,10 +437,48 @@ pub fn show_search_nav_menu(current: usize, total: usize) -> Result<NavAction> {
         s if s.contains("Prev") => Ok(NavAction::Prev),
         s if s.contains("Random") => Ok(NavAction::Random),
         s if s.contains("Open in Browser") => Ok(NavAction::OpenInBrowser),
+        s if s.contains("Open in Browser") => Ok(NavAction::OpenInBrowser),
+        s if s.contains("Category") => Ok(NavAction::SettingsCategory),
+        s if s.contains("Purity") => Ok(NavAction::SettingsPurity),
+        s if s.contains("Sorting") => Ok(NavAction::SettingsSorting),
         s if s.contains("Done") => Ok(NavAction::Done),
-        s if s.contains("Cancel") => Ok(NavAction::Cancel),
         _ => Ok(NavAction::None),
     }
+}
+
+pub fn show_selection_menu(prompt: &str, items: &[String]) -> Result<Option<String>> {
+    let mut options = String::new();
+    for item in items {
+        options.push_str(item);
+        options.push('\n');
+    }
+    options.push_str("❌ Cancel\n");
+
+    let mut child = Command::new("fuzzel")
+        .arg("--dmenu")
+        .arg("-p")
+        .arg(prompt)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin.write_all(options.as_bytes())?;
+    }
+
+    let output = child.wait_with_output()?;
+
+    if !output.status.success() {
+        return Ok(None);
+    }
+
+    let selection = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    if selection.contains("Cancel") || selection.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(selection))
 }
 
 pub fn show_preview_menu() -> Result<NavAction> {

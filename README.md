@@ -7,6 +7,7 @@ A Rust-based CLI tool for managing wallpapers from Wallhaven on Hyprland (Waylan
 ## Features
 
 - **Interactive Menu**: Browse and select wallpapers using `fuzzel`.
+- **Collections**: Browse and cycle through your personal Wallhaven collections (requires API key).
 - **Search**: Search Wallhaven with support for queries, categories, purity, and sorting.
 - **Rotate**: Quickly set a random wallpaper from the "Hot" list.
 - **Specific Set**: Set wallpapers by Wallhaven ID or direct URL.
@@ -38,9 +39,9 @@ A Rust-based CLI tool for managing wallpapers from Wallhaven on Hyprland (Waylan
 You can install `hyprwallhaven` directly from the AUR using your preferred helper:
 
 ```bash
-yay -S hyprwallhaven-git
+yay -S hyprwallhaven-bin
 # or
-paru -S hyprwallhaven-git
+paru -S hyprwallhaven-bin
 ```
 
 ### Build from Source
@@ -65,15 +66,25 @@ paru -S hyprwallhaven-git
 
 ## Setup & Configuration
 
-### 1. Hyprland (Restore on Boot)
+### 1. Restore on Boot (Systemd)
 
-To ensure your wallpapers are restored after a reboot or session restart, add the following line to your `~/.config/hypr/hyprland.conf`:
+The recommended way to restore wallpapers is using the provided systemd user service. This ensures proper ordering after `hyprpaper`.
+
+```bash
+systemctl --user enable --now hyprwallhaven.service
+```
+
+### 2. Manual Restore (Alternative)
+
+If you prefer not to use systemd or are running from source without installing the unit file, you can add this to your `~/.config/hypr/hyprland.conf`:
 
 ```ini
 exec-once = hyprwallhaven restore
 ```
 
-### 2. Hyprlock Integration
+> **Important:** This feature relies on `hyprpaper` and `systemd` user services. It is strictly recommended to run Hyprland using **UWSM** (Universal Wayland Session Manager) to ensure proper environment and service startup.
+
+### 3. Hyprlock Integration
 
 HyprWallhaven automatically maintains a separate configuration file for `hyprlock` that ensures your lock screen background matches your desktop wallpaper.
 
@@ -83,7 +94,7 @@ To enable this, add the following line to your `~/.config/hypr/hyprlock.conf`:
 source = ~/.config/hypr/hyprwallhaven-hyprlock.conf
 ```
 
-### 3. General Configuration
+### 4. General Configuration
 
 The main configuration file is located at `~/.config/hypr/hyprwallhaven.toml`. It is generated automatically on the first run.
 
@@ -115,6 +126,8 @@ To access NSFW or restricted content, an API key is required:
 
 1.  Get your API key from your [Wallhaven Account Settings](https://wallhaven.cc/settings/account).
 2.  Uncomment and set `api_key` in `~/.config/hypr/hyprwallhaven.toml`.
+
+> **Note:** An API Key is **required** to use the Collections feature.
 
 ## Usage
 

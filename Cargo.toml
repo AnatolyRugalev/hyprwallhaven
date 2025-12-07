@@ -1,6 +1,6 @@
 [package]
 name = "hyprwallhaven"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "A CLI tool for managing Wallhaven wallpapers on Hyprland with fuzzel integration"
 authors = ["Your Name <your.email@example.com>"]
