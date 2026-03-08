@@ -24,8 +24,7 @@ fn default_wallpaper_mode() -> String {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            wallpaper_cmd: "hyprctl hyprpaper preload %f; hyprctl hyprpaper wallpaper \"%m,%f\""
-                .to_string(),
+            wallpaper_cmd: "hyprctl hyprpaper wallpaper \"%m,%f\"".to_string(),
             save_dir: "~/Pictures/Wallpapers/Wallhaven".to_string(),
             api_key: None,
             username: None,
@@ -54,6 +53,7 @@ pub fn load_config() -> Result<Config> {
 
     let content = fs::read_to_string(&config_path)?;
     let config: Config = toml::from_str(&content)?;
+
     Ok(config)
 }
 

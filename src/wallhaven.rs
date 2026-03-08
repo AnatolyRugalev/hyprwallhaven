@@ -123,11 +123,9 @@ pub fn get_my_collections(config: &Config) -> Result<Vec<Collection>> {
 
     let resp = client.get(&url).send()?;
     let text = resp.error_for_status()?.text()?;
-    eprintln!("DEBUG: Collections response: {}", text);
     let resp: CollectionsResponse = serde_json::from_str(&text)?;
     Ok(resp.data)
 }
-
 
 pub fn get_collection_wallpapers(
     config: &Config,
@@ -150,7 +148,7 @@ pub fn get_collection_wallpapers(
     }
 
     let resp = client.get(&url).send()?;
-    
+
     if resp.status() == StatusCode::UNAUTHORIZED {
         anyhow::bail!("401 Unauthorized: API Key required/invalid.");
     }
@@ -171,8 +169,6 @@ pub fn get_username(config: &Config) -> Result<String> {
 
     let resp = client.get(&url).send()?;
     let text = resp.error_for_status()?.text()?;
-    eprintln!("DEBUG: Settings response: {}", text);
     let resp: SettingsResponse = serde_json::from_str(&text)?;
     Ok(resp.data.username)
 }
-

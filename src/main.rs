@@ -326,15 +326,15 @@ fn set_system_wallpaper(path: &PathBuf, config: &config::Config, monitor_name: &
     cmd_str = cmd_str.replace("monitor_name", monitor_name);
 
     // Apply wallpaper mode for hyprpaper
-    eprintln!("DEBUG: Wallpaper mode: {}", config.wallpaper_mode);
-    eprintln!("DEBUG: Command before modification: {}", cmd_str);
-    if config.wallpaper_mode == "contain" || config.wallpaper_mode == "tile" {
-        if cmd_str.contains("hyprpaper") {
-            let mode_prefix = format!(",{}:/", config.wallpaper_mode);
-            cmd_str = cmd_str.replace(",/", &mode_prefix);
-        }
+    if (config.wallpaper_mode == "contain" || config.wallpaper_mode == "tile")
+        && cmd_str.contains("hyprpaper wallpaper")
+    {
+        cmd_str = format!(
+            "{},{}",
+            cmd_str.trim_end_matches('"'),
+            &format!("{}\"", config.wallpaper_mode)
+        );
     }
-    eprintln!("DEBUG: Command after modification: {}", cmd_str);
 
     println!("Executing: {}", cmd_str);
 
@@ -661,7 +661,7 @@ fn view_collection_wallpapers(
     let original_workspace_id = monitor.active_workspace.id;
 
     println!("Viewing collection: {}", collection_label);
-    
+
     // 2. Fetch Wallpapers (Page 1 initially)
     let mut current_page = 1;
     let mut wallpapers =
@@ -687,27 +687,27 @@ fn view_collection_wallpapers(
 
     // Set first immediately
     {
-         let chosen_summary = &wallpapers[index];
-         // Collection API returns simplified wallpaper objects, might need full info to get path if not present?
-         // SearchResponse from wallhaven usually includes 'path'. Let's check wallhaven.rs struct. 
-         // Wallpaper struct has 'path'. API search/collection results usually have it.
-         // If "path" is missing/empty, we might need get_wallpaper_info. 
-         // But let's assume it's there for now as search_wallpapers uses it directly too.
-         
-         // Actually, wait, search_interactive fetches info again:
-         // let chosen = get_wallpaper_info(&chosen_summary.id, config)?;
-         // Let's do the same for consistency.
-         match get_wallpaper_info(&chosen_summary.id, config) {
-             Ok(chosen) => {
-                 let ext = chosen.path.split('.').last().unwrap_or("jpg");
-                 let filename = format!("wallhaven-{}.{}", chosen.id, ext);
-                 let save_path = expand_path(&config.save_dir).join(&filename);
-                 download_wallpaper(&chosen.path, &save_path)?;
-                 set_system_wallpaper(&save_path, config, &monitor.name)?;
-                 _current_set_path = Some(save_path);
-             },
-             Err(e) => eprintln!("Failed to load wallpaper info: {}", e),
-         }
+        let chosen_summary = &wallpapers[index];
+        // Collection API returns simplified wallpaper objects, might need full info to get path if not present?
+        // SearchResponse from wallhaven usually includes 'path'. Let's check wallhaven.rs struct.
+        // Wallpaper struct has 'path'. API search/collection results usually have it.
+        // If "path" is missing/empty, we might need get_wallpaper_info.
+        // But let's assume it's there for now as search_wallpapers uses it directly too.
+
+        // Actually, wait, search_interactive fetches info again:
+        // let chosen = get_wallpaper_info(&chosen_summary.id, config)?;
+        // Let's do the same for consistency.
+        match get_wallpaper_info(&chosen_summary.id, config) {
+            Ok(chosen) => {
+                let ext = chosen.path.split('.').last().unwrap_or("jpg");
+                let filename = format!("wallhaven-{}.{}", chosen.id, ext);
+                let save_path = expand_path(&config.save_dir).join(&filename);
+                download_wallpaper(&chosen.path, &save_path)?;
+                set_system_wallpaper(&save_path, config, &monitor.name)?;
+                _current_set_path = Some(save_path);
+            }
+            Err(e) => eprintln!("Failed to load wallpaper info: {}", e),
+        }
     }
 
     'nav_loop: loop {
@@ -719,33 +719,38 @@ fn view_collection_wallpapers(
         // So generic search menu might show options that don't do anything here.
         // We should arguably use a simpler menu or ignore those actions.
         // Let's use show_search_nav_menu but ignore settings.
-        
+
         match ui::show_search_nav_menu(
             index,
             total,
             config.api_key.is_some(),
             "N/A", // user can't change category of a collection view usually
             "N/A",
-            "N/A", 
+            "N/A",
         )? {
             NavAction::Next => {
-                 if index + 1 >= total {
+                if index + 1 >= total {
                     // Try next page?
-                    let next_page_wallpapers = wallhaven::get_collection_wallpapers(config, username, collection_id, current_page + 1)?;
+                    let next_page_wallpapers = wallhaven::get_collection_wallpapers(
+                        config,
+                        username,
+                        collection_id,
+                        current_page + 1,
+                    )?;
                     if !next_page_wallpapers.is_empty() {
-                         current_page += 1;
-                         wallpapers.extend(next_page_wallpapers);
-                         total = wallpapers.len();
-                         index += 1;
+                        current_page += 1;
+                        wallpapers.extend(next_page_wallpapers);
+                        total = wallpapers.len();
+                        index += 1;
                     } else {
-                         index = 0; // Loop back to start
+                        index = 0; // Loop back to start
                     }
                 } else {
                     index += 1;
                 }
             }
             NavAction::Prev => {
-                 if index == 0 {
+                if index == 0 {
                     index = total - 1;
                 } else {
                     index -= 1;
@@ -762,8 +767,8 @@ fn view_collection_wallpapers(
                 std::process::exit(0);
             }
             NavAction::Done => {
-                 hyprland::dispatch_workspace(original_workspace_id)?;
-                 std::process::exit(0);
+                hyprland::dispatch_workspace(original_workspace_id)?;
+                std::process::exit(0);
             }
             NavAction::Cancel | NavAction::None => {
                 hyprland::dispatch_workspace(original_workspace_id)?;
@@ -780,20 +785,20 @@ fn view_collection_wallpapers(
         // Apply new selection
         let chosen_summary = &wallpapers[index];
         match get_wallpaper_info(&chosen_summary.id, config) {
-             Ok(chosen) => {
-                 let ext = chosen.path.split('.').last().unwrap_or("jpg");
-                 let filename = format!("wallhaven-{}.{}", chosen.id, ext);
-                 let save_path = expand_path(&config.save_dir).join(&filename);
-                 match download_wallpaper(&chosen.path, &save_path) {
+            Ok(chosen) => {
+                let ext = chosen.path.split('.').last().unwrap_or("jpg");
+                let filename = format!("wallhaven-{}.{}", chosen.id, ext);
+                let save_path = expand_path(&config.save_dir).join(&filename);
+                match download_wallpaper(&chosen.path, &save_path) {
                     Ok(_) => {
-                         set_system_wallpaper(&save_path, config, &monitor.name)?;
-                         _current_set_path = Some(save_path);
+                        set_system_wallpaper(&save_path, config, &monitor.name)?;
+                        _current_set_path = Some(save_path);
                     }
                     Err(e) => eprintln!("Failed to download wallpaper: {}", e),
-                 }
-             },
-             Err(e) => eprintln!("Failed to load wallpaper info: {}", e),
-         }
+                }
+            }
+            Err(e) => eprintln!("Failed to load wallpaper info: {}", e),
+        }
     }
 
     Ok(())
